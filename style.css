@@ -4,3 +4,8 @@
 .urgency-filters button{flex:1;max-width:100px;min-width:0;padding:10px 12px;background:#fff;color:#176b56;border-color:#bac9c0}
 .urgency-filters button:hover{background:#edf4eb}
 .urgency-filters button[aria-pressed="true"]{background:#176b56;color:#fff;border-color:#176b56;box-shadow:0 0 0 2px #c5e6d5;font-weight:750}
+
+[hidden]{display:none!important}
+.pwa-panel{position:relative;background:#fff;border:1px solid #dde5dc;border-radius:14px;padding:16px 20px;margin-bottom:20px;font-size:13px;color:#52675c}
+.pwa-panel button{margin-bottom:10px}
+.pwa-panel .message{margin-top:10px}

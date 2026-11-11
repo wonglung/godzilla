@@ -12,6 +12,23 @@
   let requests = [];
   let selectedUrgency = '全部';
   let client;
+  let sending = false;
+  let loading = false;
+
+  function updateControls() {
+    submitButton.disabled = !client || !navigator.onLine || sending;
+    refreshButton.disabled = !client || !navigator.onLine || loading;
+  }
+
+  window.addEventListener('offline', () => {
+    updateControls();
+    message(listMessage, '目前離線，無法取得最新清單。既有畫面中的紀錄可能不是最新。', 'error');
+  });
+  window.addEventListener('online', () => {
+    updateControls();
+    if (client) loadRequests();
+    else message(formMessage, '已恢復網路，但系統尚未初始化。請先保留填寫內容，再重新載入頁面。', 'error');
+  });
 
   function renderFilteredRequests() {
     const visible = selectedUrgency === '全部'
@@ -65,7 +82,14 @@
   }
 
   async function loadRequests() {
-    refreshButton.disabled = true;
+    if (!navigator.onLine) {
+      updateControls();
+      list.setAttribute('aria-busy', 'false');
+      message(listMessage, '目前離線，無法取得最新清單。既有畫面中的紀錄可能不是最新。', 'error');
+      return;
+    }
+    loading = true;
+    updateControls();
     list.setAttribute('aria-busy', 'true');
     message(listMessage, '正在載入報修紀錄…');
     try {
@@ -79,14 +103,19 @@
     } catch (error) {
       message(listMessage, `無法載入清單，請按「重新整理」再試。${requests.length ? '保留上次載入的紀錄，可切換篩選查看。' : ''} 錯誤：${error.message || '連線失敗'}`, 'error');
     } finally {
-      refreshButton.disabled = false;
+      loading = false;
+      updateControls();
       list.setAttribute('aria-busy', 'false');
     }
   }
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!client || submitButton.disabled) return;
+    if (!navigator.onLine) {
+      message(formMessage, '目前離線，報修尚未送出。請保持此頁面，恢復連線後再送出。', 'error');
+      return;
+    }
+    if (!client || sending) return;
     const values = new FormData(form);
     // Only the five permitted business fields are sent. Status and timestamps use database defaults.
     const payload = Object.fromEntries(['reporter_name', 'location', 'category', 'description', 'urgency']
@@ -95,7 +124,8 @@
       message(formMessage, '請完整填寫所有欄位，內容不能只有空白。', 'error');
       return;
     }
-    submitButton.disabled = true;
+    sending = true;
+    updateControls();
     submitButton.textContent = '送出中…';
     message(formMessage, '正在送出報修…');
     try {
@@ -107,7 +137,8 @@
     } catch (error) {
       message(formMessage, `送出失敗，填寫內容已保留。請確認連線後再試。錯誤：${error.message || '連線失敗'}`, 'error');
     } finally {
-      submitButton.disabled = false;
+      sending = false;
+      updateControls();
       submitButton.textContent = '送出報修 ↗';
     }
   });
@@ -117,13 +148,14 @@
     client = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
     });
+    updateControls();
     refreshButton.addEventListener('click', loadRequests);
     loadRequests();
   } catch (error) {
     submitButton.disabled = true;
     refreshButton.disabled = true;
     list.setAttribute('aria-busy', 'false');
-    message(formMessage, '系統初始化失敗，請重新載入頁面，並確認網路及網站設定。', 'error');
+    message(formMessage, navigator.onLine ? '系統初始化失敗，請重新載入頁面，並確認網路及網站設定。' : '目前離線，連線元件尚未準備完成。填寫內容尚未送出；請先保留內容，恢復連線後重新載入頁面。', 'error');
     message(listMessage, '無法連接報修系統，請稍後重新載入頁面。', 'error');
   }
 })();
