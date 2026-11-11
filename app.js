@@ -7,7 +7,29 @@
   const formMessage = document.querySelector('#form-message');
   const listMessage = document.querySelector('#list-message');
   const list = document.querySelector('#request-list');
+  const filterButtons = document.querySelectorAll('[data-urgency]');
+  const filterMessage = document.querySelector('#filter-message');
+  let requests = [];
+  let selectedUrgency = '全部';
   let client;
+
+  function renderFilteredRequests() {
+    const visible = selectedUrgency === '全部'
+      ? requests : requests.filter(request => request.urgency === selectedUrgency);
+    list.replaceChildren(...visible.map(renderRequest));
+    message(filterMessage, requests.length && !visible.length
+      ? `最近 20 筆紀錄中，沒有緊急程度為「${selectedUrgency}」的報修。` : '');
+  }
+
+  filterButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      selectedUrgency = button.dataset.urgency;
+      filterButtons.forEach(filter => {
+        filter.setAttribute('aria-pressed', String(filter === button));
+      });
+      renderFilteredRequests();
+    });
+  });
 
   function message(element, text, type = '') {
     element.textContent = text;
@@ -51,10 +73,11 @@
         .select('id,reporter_name,location,category,description,urgency,status,created_at')
         .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(20);
       if (error) throw error;
-      list.replaceChildren(...data.map(renderRequest));
+      requests = data;
+      renderFilteredRequests();
       message(listMessage, data.length ? '' : '目前還沒有報修紀錄，歡迎登記第一筆。');
     } catch (error) {
-      message(listMessage, `無法載入清單，請按「重新整理」再試。${list.childElementCount ? '下方保留上次載入的紀錄。' : ''} 錯誤：${error.message || '連線失敗'}`, 'error');
+      message(listMessage, `無法載入清單，請按「重新整理」再試。${requests.length ? '保留上次載入的紀錄，可切換篩選查看。' : ''} 錯誤：${error.message || '連線失敗'}`, 'error');
     } finally {
       refreshButton.disabled = false;
       list.setAttribute('aria-busy', 'false');
