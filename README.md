@@ -5,6 +5,8 @@
 
 [報修系統操作說明（Word）](文件/報修系統操作說明.docx)
 
+[報修登記系統提案（PowerPoint）](文件/報修登記系統提案.pptx)
+
 ## 網頁前端
 
 儲存庫根目錄的 `index.html`、`style.css`、`app.js`、`config.js` 為純靜態網頁，不需要建置或 npm 套件。Supabase JavaScript SDK v2 從 jsDelivr CDN 載入；`config.js` 僅包含公開專案網址與 publishable key。
