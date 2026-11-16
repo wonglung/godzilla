@@ -55,3 +55,12 @@ python -m http.server 8000
 快取僅包含網站靜態檔案、公開設定與可選的 CDN SDK，沒有報修人或問題內容。若修改任何快取檔案，需同步提高 `sw.js` 的 `CACHE_NAME` 版本（目前 v1）。新版本會等舊視窗全部關閉後生效；部署後請關閉所有此網站分頁及已安裝 App，再重新開啟並連線載入。清理舊快取只影響此 App 的 scope，不影響同網域其他專案。
 
 驗證：雲端 Chromium 在 `/godzilla/` 子路徑測試 Service Worker scope、manifest 與靜態快取；實際 CDN SDK 配合模擬 API 驗證新增欄位仍不含 status、篩選不增加請求、API 不進快取。模擬斷網後確認首頁／目錄網址可重開、清單不持久保存、送出停用、恢復連線保留當頁輸入且不補送，以及缺少 SDK 快取時仍有離線頁面及錯誤提示。390px 手機排版無水平溢出。截圖：[手機 PWA](docs/pwa-mobile.png)、[離線狀態](docs/pwa-offline.png)；測試資料皆虛構。尚未實機驗證 Android／iOS 安裝，真實 Supabase 連線與 RLS 仍待驗證。
+
+## 小遊戲
+
+兩個純靜態單頁遊戲，不需建置，直接開啟即可（GitHub Pages 上的路徑為 `/godzilla/hoshimi-run/`、`/godzilla/hoshimi-seal/`）。角色皆為原創虛構人物，最高分只存在瀏覽器的 localStorage。
+
+- [星見屋頂疾走](hoshimi-run/index.html)：跑酷吃金幣。可選四個角色（露娜、小陽、雪奈、夜音），道具有金幣×2、磁鐵、衝刺、護盾；木箱可踩在上面，只有側面撞到才會跌倒。操作：空白鍵／↑ 跳（可二段跳）、↓ 滑行、P 暫停；手機點畫面跳。
+- [星見學園封印門](hoshimi-seal/index.html)：推理不重複數字密碼的解謎遊戲，金星＝數字和位置都對、銀星＝數字對位置錯，有三種難度與筆記模式。
+
+驗證：以 Playwright 無頭瀏覽器載入兩頁確認無錯誤；跑酷頁另測試從上方落在木箱上不會結束遊戲、從側面撞上會結束。
