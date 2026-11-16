@@ -5,6 +5,9 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   // 價格四捨五入到百位，避免看起來過度精準
   const round100 = (n) => Math.round(n / 100) * 100;
+  // 國家＋城市，例如「日本・東京」；新加坡這類國家與城市同名時只顯示一次
+  const title = (d) => (d.country === d.name ? d.name : `${d.country}・${d.name}`);
+  const seasonFactor = () => D.seasons.find((s) => s.id === state.season).factor;
 
   const state = {
     picked: new Set(["tokyo", "seoul", "bangkok"]),
@@ -18,7 +21,7 @@
   function renderControls() {
     $("destinations").innerHTML = D.destinations.map((d) => `
       <label class="chip"><input type="checkbox" value="${d.id}" ${state.picked.has(d.id) ? "checked" : ""}>
-      <span>${d.flag} ${esc(d.name)}</span></label>`).join("");
+      <span>${d.flag} ${esc(title(d))}</span></label>`).join("");
     $("days").innerHTML = D.dayOptions.map((n) => `
       <label class="chip"><input type="radio" name="days" value="${n}" ${n === state.days ? "checked" : ""}>
       <span>${n} 天 ${n - 1} 夜</span></label>`).join("");
@@ -35,7 +38,7 @@
     const c = dest.cost;
     const days = state.days;
     const nights = days - 1;
-    const season = D.seasons.find((s) => s.id === state.season).factor;
+    const season = seasonFactor();
     // 一個人旅行要自己付整間房，約為兩人均分價的 1.7 倍
     const singleRoom = state.people === 1 ? 1.7 : 1;
     const items = [
@@ -52,13 +55,18 @@
 
   function itinerary(dest) {
     const days = state.days;
-    const list = [{ text: `從台灣出發（飛行${dest.flightHours}），抵達${dest.name}，入住飯店、周邊散步與晚餐` }];
+    const list = [{ text: `從台灣出發（飛行${dest.flightHours}），抵達${title(dest)}，入住飯店、周邊散步`, lunch: "機上餐", dinner: dest.arrive }];
     for (let i = 0; i < days - 2; i++) {
-      list.push(i < dest.plan.length
-        ? { text: dest.plan[i] }
-        : { text: "自由活動：再訪喜歡的地方、購物或安排近郊小旅行", free: true });
+      if (i < dest.plan.length) {
+        const [text, lunch, dinner] = dest.plan[i];
+        list.push({ text, lunch, dinner });
+      } else {
+        // 天數超過準備的行程時，從必吃美食清單輪流推薦
+        const f = dest.foods[i % dest.foods.length];
+        list.push({ text: "自由活動：再訪喜歡的地方、購物或安排近郊小旅行", lunch: "自由選擇", dinner: `${f.name}（${f.where}）`, free: true });
+      }
     }
-    list.push({ text: "整理行李、最後採買伴手禮 → 搭機返回台灣" });
+    list.push({ text: "整理行李、最後採買伴手禮 → 搭機返回台灣", lunch: dest.depart, dinner: "機上餐" });
     return list;
   }
 
@@ -85,7 +93,7 @@
       const over = state.budget && r.e.perPerson > state.budget;
       const tag = over ? `<span class="tag over">超出預算</span>` : i === 0 && rows.length > 1 ? `<span class="tag cheap">最省</span>` : "";
       return `<div class="bar-row${over ? " over" : ""}">
-        <a href="#dest-${r.d.id}">${r.d.flag} ${esc(r.d.name)}${tag}</a>
+        <a href="#dest-${r.d.id}">${r.d.flag} ${esc(title(r.d))}${tag}</a>
         <div class="bar" aria-hidden="true"><i style="width:${(r.e.perPerson / max) * 100}%;background:${r.d.color}"></i></div>
         <strong>${fmt(r.e.perPerson)}<small style="display:block;font-weight:400;color:var(--muted);font-size:.75rem">每人</small></strong>
       </div>`;
@@ -93,13 +101,14 @@
 
     $("cards").innerHTML = rows.map(({ d, e }) => {
       const short = state.days < d.minDays
-        ? `<p class="note">${esc(d.name)}建議至少 ${d.minDays} 天，${state.days} 天扣掉飛行時間會比較趕。</p>` : "";
+        ? `<p class="note">${esc(title(d))}建議至少 ${d.minDays} 天，${state.days} 天扣掉飛行時間會比較趕。</p>` : "";
       const over = state.budget && e.perPerson > state.budget
         ? `<p class="note">每人超出預算 ${fmt(e.perPerson - state.budget)}，可以改選「經濟」等級、淡季出發或縮短天數。</p>` : "";
       return `<article class="card" id="dest-${d.id}" style="--c:${d.color}">
         <div class="card-head">
-          <h3>${d.flag} ${esc(d.name)}</h3>
-          <p class="meta">${esc(d.region)}・飛行${esc(d.flightHours)}・${esc(d.visa)}</p>
+          <p class="country">${d.flag} ${esc(d.country)}<span>${esc(d.region)}</span></p>
+          <h3>${esc(title(d))}</h3>
+          <p class="meta">飛行${esc(d.flightHours)}・${esc(d.visa)}</p>
           <div class="totals">
             <div>每人約<b>${fmt(e.perPerson)}</b></div>
             <div>${state.people} 人合計約<b>${fmt(e.group)}</b></div>
@@ -114,11 +123,25 @@
               ${e.items.map((i) => `<tr><td>${esc(i.label)}<small>${esc(i.note)}</small></td><td>${fmt(i.value)}</td></tr>`).join("")}
               <tr class="sum"><td>合計</td><td>${fmt(e.perPerson)}</td></tr>
             </tbody></table>
+            <h4>推薦飯店</h4>
+            <ul class="hotels">${d.hotels.map((h, t) => `
+              <li class="${t === state.tier ? "current" : ""}">
+                <p class="hotel-tier">${esc(D.tiers[t].label)}${t === state.tier ? `<span class="tag cheap">目前選擇</span>` : ""}
+                  <em>每房每晚約 ${fmt(round100(d.cost.hotel[t] * 2 * seasonFactor()))}</em></p>
+                <p>${esc(h.names)}</p>
+                <small>住宿區域：${esc(h.area)}</small>
+              </li>`).join("")}
+            </ul>
           </div>
           <div>
             <h4>建議行程</h4>
-            <ol class="days">${itinerary(d).map((x) => `<li class="${x.free ? "free" : ""}">${esc(x.text)}</li>`).join("")}</ol>
+            <ol class="days">${itinerary(d).map((x) => `<li class="${x.free ? "free" : ""}"><div>${esc(x.text)}
+              <p class="meals"><span><b>午餐</b>${esc(x.lunch)}</span><span><b>晚餐</b>${esc(x.dinner)}</span></p></div></li>`).join("")}</ol>
           </div>
+        </div>
+        <div class="foods">
+          <h4>必吃美食<small>每人約略價格</small></h4>
+          <ul>${d.foods.map((f) => `<li><b>${esc(f.name)}</b><span>${esc(f.where)}</span><em>約 ${fmt(f.price)}</em></li>`).join("")}</ul>
         </div>
       </article>`;
     }).join("");
