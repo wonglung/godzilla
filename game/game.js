@@ -1,28 +1,27 @@
-// 時間守護大作戰：以原創劇場版《風見町劇場版》為題材的「一二三木頭人」小遊戲
+// 時間守護大作戰：「一二三木頭人」小遊戲，角色為小新、小白、小葵
 (function () {
   "use strict";
 
-  var movie = window.MY_MOVIE || { characters: [] };
-  function colorOf(name, fallback) {
-    var found = (movie.characters || []).filter(function (c) { return c.name === name; })[0];
-    return found ? found.color : fallback;
-  }
-
+  // 可選角色：圖示用 emoji，不使用任何官方圖片
   var HEROES = [
     {
-      name: "小風", color: colorOf("小風", "#e8473d"), speed: 1.0, lives: 3,
-      skill: "手電筒", effect: "blind",
-      desc: "速度普通。技能「手電筒」：照得黑時計睜不開眼，3 秒內不會回頭。",
+      name: "小新", icon: "👦", color: "#e8473d", speed: 1.0, lives: 3,
+      skill: "屁屁舞", effect: "blind",
+      desc: "速度普通。技能「屁屁舞」：黑時計笑到停不下來，3 秒內不會回頭。",
+      skillMsg: "小新跳起屁屁舞！黑時計笑到停不下來，3 秒內快衝！",
     },
     {
-      name: "月影", color: colorOf("月影", "#3a4bb0"), speed: 1.25, lives: 3,
-      skill: "隱身術", effect: "hide",
-      desc: "跑最快。技能「隱身術」：2.5 秒內被看到也不會被抓（這次忍住不打噴嚏！）。",
+      name: "小白", icon: "🐶", color: "#8a94a8", speed: 1.25, lives: 3,
+      skill: "棉花糖", effect: "hide",
+      desc: "跑最快。技能「棉花糖」：縮成一團棉花糖，2.5 秒內被看到也不會被抓。",
+      skillMsg: "小白縮成棉花糖！2.5 秒內被看到也沒關係！",
     },
     {
-      name: "鐵之介", color: colorOf("鐵之介", "#b0611a"), speed: 0.9, lives: 4,
-      skill: "刀背守護", effect: "shield",
-      desc: "比較慢但多一顆愛心。技能「刀背守護」：擋下下一次被抓。",
+      name: "小葵", icon: "👶", color: "#e86a9b", speed: 0.9, lives: 4,
+      skill: "閃亮亮眼神", effect: "shield",
+      desc: "爬得比較慢但多一顆愛心。技能「閃亮亮眼神」：擋下下一次被抓。",
+      skillMsg: "小葵閃亮亮眼神發動！下一次被抓會被擋下來。",
+      blockMsg: "小葵的閃亮亮眼神讓黑時計心軟了！先放開，等他轉回去。",
     },
   ];
 
@@ -103,12 +102,12 @@
 
   function showTitle() {
     s.screen = "title";
-    openPanel("選擇你的角色", movie.tagline || "在月圓之夜前，奪回被偷走的時間！", function (body) {
+    openPanel("選擇你的角色", "在月圓之夜前，奪回被黑時計偷走的時間！", function (body) {
       var list = el("div", "hero-list");
       HEROES.forEach(function (h) {
         var btn = el("button", "hero-card");
         btn.type = "button";
-        var av = el("span", "hero-avatar", h.name.charAt(0));
+        var av = el("span", "hero-avatar", h.icon);
         av.style.background = h.color;
         btn.appendChild(av);
         var info = el("span", "hero-info");
@@ -128,7 +127,8 @@
     s.score = 0;
     s.level = 0;
     ui.player.style.background = hero.color;
-    ui.initial.textContent = hero.name.charAt(0);
+    ui.initial.textContent = hero.icon;
+    ui.player.setAttribute("aria-label", hero.name);
     startLevel();
   }
 
@@ -192,7 +192,7 @@
 
   function lose(reason) {
     s.screen = "end";
-    endPanel("被凍結了……", reason + " 別灰心，月影也是第 13 次才成功的！");
+    endPanel("被凍結了……", reason + " 別灰心，再試一次就好！");
   }
 
   // ---------- 遊戲邏輯 ----------
@@ -220,13 +220,13 @@
     if (e === "blind") {
       s.blindT = 3;
       setGuard("back", 3);
-      say("手電筒一照！黑時計睜不開眼，3 秒內快衝！", 3);
+      say(s.hero.skillMsg, 3);
     } else if (e === "hide") {
       s.hideT = 2.5;
-      say("隱身術成功！2.5 秒內被看到也沒關係！", 2.5);
+      say(s.hero.skillMsg, 2.5);
     } else {
       s.shield = true;
-      say("刀背守護！下一次被抓會被擋下來。", 1.5);
+      say(s.hero.skillMsg, 1.5);
     }
   }
 
@@ -235,7 +235,7 @@
     if (s.shield) {
       s.shield = false;
       s.stunT = 0.6;
-      say("鏘！鐵之介用刀背擋下了！先放開，等他轉回去。", 1.5);
+      say(s.hero.blockMsg, 1.5);
       return;
     }
     s.lives -= 1;
