@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>時間守護大作戰</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>時間守護大作戰</h1>
+    <p>《風見町劇場版：忍者與武士的千年約定》小遊戲</p>
+  </header>
+
+  <main class="wrap">
+    <section class="hud" aria-label="遊戲狀態">
+      <span id="hud-level">—</span>
+      <span id="hud-lives" aria-label="生命"></span>
+      <span id="hud-score">分數 0</span>
+    </section>
+
+    <div class="moon-bar" aria-hidden="true"><div id="moon-fill"></div></div>
+    <p class="moon-label" id="moon-label">月圓之夜倒數</p>
+
+    <section class="stage" id="stage" data-guard="back" aria-label="遊戲畫面">
+      <div class="track"></div>
+      <div class="frozen" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="player" id="player"><span id="player-initial">小</span></div>
+      <div class="goal" aria-hidden="true">⌛</div>
+      <div class="guard" id="guard">
+        <span class="guard-face" id="guard-face">黑</span>
+        <span class="guard-label" id="guard-label">背對中</span>
+      </div>
+    </section>
+
+    <p class="status" id="status" aria-live="polite">選一位角色開始吧！</p>
+
+    <section class="controls">
+      <button type="button" class="move" id="btn-move">按住前進</button>
+      <button type="button" class="skill" id="btn-skill">技能</button>
+    </section>
+
+    <details class="help" open>
+      <summary>怎麼玩</summary>
+      <ul>
+        <li>黑時計<strong>背對你</strong>時，按住「按住前進」往沙漏走。</li>
+        <li>出現<strong>「滴答滴答」</strong>就是他要回頭了，馬上放開！</li>
+        <li>他<strong>盯著你</strong>時還在移動，就會被抓：扣一顆愛心、往後退。</li>
+        <li>每關技能只能用一次。在月亮升到最高點前打破沙漏就過關。</li>
+        <li>鍵盤：按住<kbd>空白鍵</kbd>或<kbd>→</kbd>前進，<kbd>E</kbd>使用技能。</li>
+      </ul>
+    </details>
+
+    <p class="note">
+      <a href="../my-movie/">← 回到原創劇場版</a>
+      <span id="best"></span>
+    </p>
+  </main>
+
+  <div class="overlay" id="overlay">
+    <div class="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title">
+      <h2 id="panel-title"></h2>
+      <p id="panel-text"></p>
+      <div id="panel-body"></div>
+    </div>
+  </div>
+
+  <script src="../my-movie/movie.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
