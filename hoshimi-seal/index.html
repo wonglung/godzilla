@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>星見學園封印門</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Kosugi+Maru&display=swap">
+<style>
+/* Layout: one column — character + speech bubble on top, magic-circle seal readout, keypad, then the spell log. Single twilight-sky look by choice. */
+:root{
+  --sky:#1d1838; --sky2:#2b2352; --card:#2a2450; --line:#4a3f7d;
+  --ink:#fff6fb; --dim:#b7aedb; --pink:#ff8fbf; --pink-deep:#d4588f;
+  --gold:#ffd66b; --mint:#7fe3c8; --bad:#ff8a8a;
+  --f-display:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-num:"Kosugi Maru","Noto Sans TC",ui-rounded,system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--sky);background-image:radial-gradient(ellipse at 50% 0%,#3d2f6e 0%,transparent 60%),linear-gradient(180deg,var(--sky2),var(--sky));background-attachment:fixed;color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+#stars{position:fixed;inset:0;pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;max-width:520px;margin:0 auto;padding-block:18px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+h1{font-family:var(--f-display);font-weight:900;font-size:26px;margin:0;letter-spacing:.04em;color:var(--ink);text-shadow:0 2px 0 var(--pink-deep),0 0 18px #ff8fbf66;text-wrap:balance}
+h1 small{display:block;font-size:12px;font-weight:500;letter-spacing:.2em;color:var(--pink);text-shadow:none}
+.modes{display:flex;gap:6px}
+.modes button{font:700 13px var(--f-body);background:#ffffff10;color:var(--dim);border:1.5px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer}
+.modes button[aria-pressed="true"]{color:#3a1430;background:var(--pink);border-color:var(--pink)}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+.stage{display:grid;grid-template-columns:118px 1fr;gap:10px;align-items:end}
+.chara{width:118px;height:130px;filter:drop-shadow(0 6px 12px #0007)}
+.chara.bounce{animation:bounce .5s}
+@keyframes bounce{40%{transform:translateY(-8px)}}
+.bubble{position:relative;background:var(--ink);color:#3a2754;border-radius:16px;padding:10px 14px;font-weight:500;font-size:14.5px;min-height:64px;display:flex;flex-direction:column;justify-content:center;margin-bottom:34px;min-width:0}
+.bubble::before{content:"";position:absolute;left:-9px;bottom:16px;border:9px solid transparent;border-right-color:var(--ink);border-left:0}
+.bubble .who{font-size:11px;font-weight:700;color:var(--pink-deep);letter-spacing:.1em}
+
+.seal{background:linear-gradient(180deg,#352c63,var(--card));border:1.5px solid var(--line);border-radius:18px;padding:14px 14px 10px;box-shadow:0 10px 30px #0006,inset 0 1px 0 #ffffff18}
+.stats{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);gap:8px;flex-wrap:wrap}
+.stats b{color:var(--ink);font-variant-numeric:tabular-nums}
+.slots{display:flex;justify-content:center;gap:10px;margin:12px 0 2px}
+.slot{width:54px;height:54px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#4b3f86,#1a1535);border:2px solid var(--line);display:grid;place-items:center;font:400 28px var(--f-num);color:var(--gold);text-shadow:0 0 10px #ffd66b99;transition:border-color .15s,transform .15s}
+.slot.cur{border-color:var(--pink);box-shadow:0 0 12px #ff8fbf88}
+.slot.filled{transform:scale(1.04)}
+.slots.shake{animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+.keypad{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.key{font:400 24px var(--f-num);height:52px;border-radius:14px;border:1.5px solid var(--line);background:linear-gradient(180deg,#40357a,#2e265a);color:var(--ink);cursor:pointer;box-shadow:0 3px 0 #140f2b}
+.key:active{transform:translateY(3px);box-shadow:none}
+.key[data-mark="no"]{color:#6d6496;text-decoration:line-through}
+.key[data-mark="yes"]{color:var(--mint);border-color:var(--mint)}
+.key[data-mark="maybe"]{color:var(--gold);border-color:#a8873c}
+.key:disabled{opacity:.35;cursor:default}
+.actions{display:grid;grid-template-columns:1fr 1fr 2fr;gap:8px}
+.act{font:700 15px var(--f-body);height:46px;border-radius:14px;border:1.5px solid var(--line);background:#ffffff0c;color:var(--ink);cursor:pointer}
+.act.primary{background:linear-gradient(180deg,#ffa6cc,var(--pink));color:#3a1430;border-color:var(--pink);box-shadow:0 3px 0 var(--pink-deep)}
+.act.primary:disabled{opacity:.4;cursor:default}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--dim)}
+.toggle{font:500 12px var(--f-body);background:transparent;border:1.5px solid var(--line);color:var(--dim);border-radius:999px;padding:4px 10px;cursor:pointer}
+.toggle[aria-pressed="true"]{color:var(--gold);border-color:var(--gold)}
+
+.log{display:flex;flex-direction:column;gap:6px}
+.row{display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:10px;padding:7px 12px;border-radius:12px;background:#140f2b99;border:1px solid #3a3168}
+.row .n{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.row .g{font:400 21px var(--f-num);letter-spacing:.35em;color:var(--ink)}
+.pegs{display:flex;gap:3px;font-size:16px;line-height:1}
+.peg.hit{color:var(--gold);text-shadow:0 0 6px #ffd66baa}
+.peg.near{color:#cfd3ff}
+.peg.miss{color:#4a4178}
+.row.empty{opacity:.35}
+.cands{text-align:right;font-size:12px;color:var(--dim);min-height:1.4em}
+
+details{border-top:1px solid var(--line);padding-top:12px;color:var(--dim);font-size:13.5px}
+summary{cursor:pointer;color:var(--ink);font-weight:700}
+details p{margin:.6em 0;max-width:62ch}
+
+.overlay{position:fixed;inset:0;background:#0d0a1fd0;display:grid;place-items:center;padding:16px;z-index:20}
+.card{background:linear-gradient(180deg,#3a2f6e,var(--card));border:2px solid var(--pink);border-radius:22px;padding:22px;max-width:360px;width:100%;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
+.card .chara{width:110px;height:120px}
+.card h2{font-weight:900;font-size:24px;margin:0;color:var(--pink)}
+.card .code{font:400 34px var(--f-num);letter-spacing:.3em;color:var(--gold);text-shadow:0 0 12px #ffd66b88}
+.card p{margin:0;color:var(--dim)}
+.card .act{width:100%}
+@media (max-width:420px){.stage{grid-template-columns:96px 1fr}.chara{width:96px;height:106px}.slot{width:46px;height:46px;font-size:24px}.key{height:48px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<canvas id="stars" aria-hidden="true"></canvas>
+<div class="wrap">
+  <header>
+    <h1><small>HOSHIMI ACADEMY</small>星見學園封印門</h1>
+    <div class="modes" role="group" aria-label="難度">
+      <button data-len="3" data-max="8">見習</button>
+      <button data-len="4" data-max="10">正式</button>
+      <button data-len="5" data-max="10">禁咒</button>
+    </div>
+  </header>
+
+  <div class="stage">
+    <svg class="chara" id="chara" viewBox="0 0 120 132" role="img" aria-label="魔法少女露娜"></svg>
+    <div class="bubble" aria-live="polite"><span class="who">露娜</span><span id="say"></span></div>
+  </div>
+
+  <section class="seal" aria-label="咒文輸入">
+    <div class="stats"><span>詠唱 <b id="tries">0</b>/<b id="max">10</b></span><span>時間 <b id="time">00:00</b></span><span>最佳 <b id="best">—</b></span></div>
+    <div class="slots" id="slots"></div>
+  </section>
+
+  <div class="keypad" id="keypad"></div>
+  <div class="bar">
+    <span>筆記：點數字循環標記 <span style="color:var(--gold)">可能</span>／<span style="color:var(--mint)">確定</span>／<span style="color:#8b83b5;text-decoration:line-through">排除</span></span>
+    <button class="toggle" id="noteBtn" aria-pressed="false">筆記模式</button>
+  </div>
+  <div class="actions">
+    <button class="act" id="del">刪除</button>
+    <button class="act" id="clr">清空</button>
+    <button class="act primary" id="go" disabled>詠唱！</button>
+  </div>
+
+  <div class="bar">
+    <span>詠唱紀錄</span>
+    <button class="toggle" id="candBtn" aria-pressed="false">露娜的占卜（剩餘可能數）</button>
+  </div>
+  <div class="cands" id="cands"></div>
+  <div class="log" id="log"></div>
+
+  <details>
+    <summary>封印的規則</summary>
+    <p>封印門的咒文是一串 0–9 的魔法數字，每個數字都不重複。每次詠唱後，門上會亮起星星（星星不會告訴你是哪一位）：</p>
+    <p><span class="peg hit">★</span> 金星：有一個數字對、位置也對。<br>
+       <span class="peg near">☆</span> 銀星：有一個數字在咒文裡，但位置錯了。<br>
+       <span class="peg miss">・</span> 暗點：其餘數字不在咒文裡。</p>
+    <p>見習 3 位 8 次、正式 4 位 10 次、禁咒 5 位 10 次。真正的高手不用露娜的占卜。</p>
+  </details>
+</div>
+
+<div class="overlay" id="over" hidden>
+  <div class="card">
+    <svg class="chara" id="chara2" viewBox="0 0 120 132" aria-hidden="true"></svg>
+    <h2 id="oTitle"></h2>
+    <div class="code" id="oCode"></div>
+    <p id="oText"></p>
+    <button class="act primary" id="again">再挑戰一次</button>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const S={len:4,max:10,secret:[],input:[],hist:[],marks:{},note:false,showC:false,start:0,timer:null,done:false};
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+/* ---------- 原創角色：露娜（SVG 表情） ---------- */
+function faceSVG(mood){
+  const eyes={
+    idle:`<ellipse cx="46" cy="76" rx="6" ry="8" fill="#3b2a6b"/><ellipse cx="74" cy="76" rx="6" ry="8" fill="#3b2a6b"/><ellipse cx="46" cy="77" rx="4" ry="5.5" fill="#8a5cf0"/><ellipse cx="74" cy="77" rx="4" ry="5.5" fill="#8a5cf0"/><circle cx="44" cy="73" r="2.2" fill="#fff"/><circle cx="72" cy="73" r="2.2" fill="#fff"/><circle cx="48" cy="80" r="1" fill="#fff"/><circle cx="76" cy="80" r="1" fill="#fff"/>`,
+    happy:`<path d="M40 78 Q46 70 52 78" stroke="#3b2a6b" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M68 78 Q74 70 80 78" stroke="#3b2a6b" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+    think:`<path d="M40 77 L52 77" stroke="#3b2a6b" stroke-width="3" stroke-linecap="round"/><ellipse cx="74" cy="76" rx="6" ry="8" fill="#3b2a6b"/><ellipse cx="74" cy="77" rx="4" ry="5.5" fill="#8a5cf0"/><circle cx="72" cy="73" r="2.2" fill="#fff"/>`,
+    shock:`<circle cx="46" cy="76" r="6" fill="#fff" stroke="#3b2a6b" stroke-width="2"/><circle cx="74" cy="76" r="6" fill="#fff" stroke="#3b2a6b" stroke-width="2"/><circle cx="46" cy="76" r="2" fill="#3b2a6b"/><circle cx="74" cy="76" r="2" fill="#3b2a6b"/>`,
+    sad:`<path d="M40 74 Q46 80 52 74" stroke="#3b2a6b" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M68 74 Q74 80 80 74" stroke="#3b2a6b" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M42 82 q-2 6 1 8 q3 -2 -1 -8z" fill="#9fd8ff"/>`
+  }[mood];
+  const mouth={idle:'<path d="M56 90 Q60 93 64 90" stroke="#b0476f" stroke-width="2" fill="none" stroke-linecap="round"/>',
+    happy:'<path d="M54 88 Q60 97 66 88 Z" fill="#b0476f"/>',
+    think:'<path d="M56 91 L63 90" stroke="#b0476f" stroke-width="2" stroke-linecap="round"/>',
+    shock:'<ellipse cx="60" cy="92" rx="3.5" ry="4.5" fill="#b0476f"/>',
+    sad:'<path d="M55 93 Q60 88 65 93" stroke="#b0476f" stroke-width="2" fill="none" stroke-linecap="round"/>'}[mood];
+  const extra=mood==='think'?'<text x="94" y="56" font-size="16" fill="#ffd66b">?</text>':mood==='happy'?'<text x="92" y="50" font-size="14" fill="#ffd66b">✦</text><text x="14" y="60" font-size="10" fill="#ff8fbf">✦</text>':mood==='shock'?'<text x="92" y="54" font-size="16" fill="#ff8a8a">!</text>':'';
+  return `
+  <path d="M22 70 Q18 112 30 128 L44 128 Q34 100 38 70Z" fill="#c9b6ff"/>
+  <path d="M98 70 Q102 112 90 128 L76 128 Q86 100 82 70Z" fill="#c9b6ff"/>
+  <path d="M34 112 Q60 104 86 112 L90 132 L30 132Z" fill="#3a2f6e"/>
+  <path d="M52 110 L60 118 L68 110" fill="#ff8fbf"/>
+  <ellipse cx="60" cy="80" rx="30" ry="29" fill="#ffe9e0"/>
+  <path d="M30 76 Q32 50 60 48 Q88 50 90 76 Q82 62 74 66 Q66 56 58 64 Q48 56 42 66 Q36 62 30 76Z" fill="#c9b6ff"/>
+  <path d="M30 76 Q30 90 34 98" stroke="#c9b6ff" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M90 76 Q90 90 86 98" stroke="#c9b6ff" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M18 54 Q60 40 102 54 Q60 62 18 54Z" fill="#2b2352"/>
+  <path d="M38 50 Q52 4 86 10 Q70 16 72 48Z" fill="#2b2352"/>
+  <path d="M40 49 Q60 44 74 47" stroke="#ff8fbf" stroke-width="4" fill="none"/>
+  <text x="76" y="22" font-size="11" fill="#ffd66b">★</text>
+  <ellipse cx="38" cy="88" rx="5" ry="3" fill="#ffb3c9" opacity=".7"/>
+  <ellipse cx="82" cy="88" rx="5" ry="3" fill="#ffb3c9" opacity=".7"/>
+  ${eyes}${mouth}${extra}`;
+}
+function mood(m,line){$('chara').innerHTML=faceSVG(m);$('say').textContent=line;const c=$('chara');c.classList.remove('bounce');void c.offsetWidth;c.classList.add('bounce')}
+
+/* ---------- 遊戲邏輯 ---------- */
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function score(sec,g){let h=0,n=0;g.forEach((d,i)=>{if(sec[i]===d)h++;else if(sec.includes(d))n++});return[h,n]}
+let allCodes=[];
+function buildCodes(len){const out=[];const rec=p=>{if(p.length===len){out.push(p.slice());return}for(let d=0;d<10;d++)if(!p.includes(d)){p.push(d);rec(p);p.pop()}};rec([]);return out}
+function remaining(){return allCodes.filter(c=>S.hist.every(h=>{const[a,b]=score(c,h.g);return a===h.h&&b===h.n})).length}
+
+function newGame(len,max){
+  S.len=len;S.max=max;S.secret=shuffle([0,1,2,3,4,5,6,7,8,9]).slice(0,len);
+  S.input=[];S.hist=[];S.marks={};S.done=false;S.start=0;clearInterval(S.timer);$('time').textContent='00:00';
+  allCodes=buildCodes(len);
+  document.querySelectorAll('.modes button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.len===len));
+  store.set('hoshimi-mode',len);
+  $('max').textContent=max;$('over').hidden=true;
+  mood('idle',{3:'見習用的小封印，3 個魔法數字！先隨便詠唱一次看看吧～',4:'這扇門要 4 個不重複的魔法數字。我們一起推理吧！',5:'禁、禁咒級的封印…5 個數字只有 10 次機會，要冷靜喔！'}[len]);
+  render();
+}
+function tick(){const s=Math.floor((Date.now()-S.start)/1000);$('time').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+
+function render(){
+  $('slots').innerHTML='';
+  for(let i=0;i<S.len;i++){const d=document.createElement('div');d.className='slot'+(i===S.input.length?' cur':'')+(S.input[i]!=null?' filled':'');d.textContent=S.input[i]??'';$('slots').appendChild(d)}
+  $('keypad').innerHTML='';
+  for(const d of [1,2,3,4,5,6,7,8,9,0]){
+    const b=document.createElement('button');b.className='key';b.textContent=d;
+    if(S.marks[d])b.dataset.mark=S.marks[d];
+    b.disabled=!S.note&&(S.done||S.input.includes(d));
+    b.setAttribute('aria-label','數字 '+d+(S.marks[d]?'，標記為'+{maybe:'可能',yes:'確定',no:'排除'}[S.marks[d]]:''));
+    b.onclick=()=>press(d);$('keypad').appendChild(b);
+  }
+  $('go').disabled=S.done||S.input.length!==S.len;
+  $('tries').textContent=S.hist.length;
+  const best=store.get('hoshimi-best-'+S.len);$('best').textContent=best?best+' 次':'—';
+  const log=$('log');log.innerHTML='';
+  for(let i=S.hist.length-1;i>=0;i--)log.appendChild(row(i+1,S.hist[i]));
+  for(let i=S.hist.length;i<S.max;i++){const r=document.createElement('div');r.className='row empty';r.innerHTML='<span class="n">'+String(i+1).padStart(2,'0')+'</span><span class="g">'+'·'.repeat(S.len)+'</span><span class="pegs"></span>';log.appendChild(r)}
+  $('cands').textContent=S.showC?'🔮 符合目前線索的咒文還有 '+remaining().toLocaleString()+' 組':'';
+}
+function row(n,h){
+  const r=document.createElement('div');r.className='row';
+  const pegs=[...Array(h.h).fill(['hit','★']),...Array(h.n).fill(['near','☆']),...Array(S.len-h.h-h.n).fill(['miss','・'])];
+  r.innerHTML='<span class="n">'+String(n).padStart(2,'0')+'</span><span class="g">'+h.g.join('')+'</span><span class="pegs" aria-label="'+h.h+' 顆金星，'+h.n+' 顆銀星">'+pegs.map(p=>'<span class="peg '+p[0]+'">'+p[1]+'</span>').join('')+'</span>';
+  return r;
+}
+function press(d){
+  if(S.note){const order=[undefined,'maybe','yes','no'];S.marks[d]=order[(order.indexOf(S.marks[d])+1)%4];if(!S.marks[d])delete S.marks[d];render();return}
+  if(S.done||S.input.length>=S.len||S.input.includes(d))return;
+  S.input.push(d);render();
+}
+function submit(){
+  if(S.done)return;
+  if(S.input.length!==S.len){mood('think','咒文還差 '+(S.len-S.input.length)+' 個數字喔！');const s=$('slots');s.classList.add('shake');setTimeout(()=>s.classList.remove('shake'),300);return}
+  if(S.hist.some(h=>h.g.join('')===S.input.join(''))){mood('shock','欸？這組我們剛剛已經詠唱過了啦！');return}
+  if(!S.start){S.start=Date.now();S.timer=setInterval(tick,1000)}
+  const g=S.input.slice();const[h,n]=score(S.secret,g);S.hist.push({g,h,n});S.input=[];
+  if(h===S.len)return end(true);
+  if(S.hist.length>=S.max)return end(false);
+  const left=S.max-S.hist.length;
+  if(left===1)mood('shock',h+' 金 '+n+' 銀…只剩最後一次了！拜託一定要中！');
+  else if(h+n===0)mood('happy','完全沒反應！可是這代表 '+g.join('、')+' 全部都可以排除了，賺到了～');
+  else if(h+n===S.len)mood('happy','數字全部都對了！只要把位置排好就能開門！');
+  else if(h>=S.len-1)mood('shock','就差一點點！'+h+' 顆金星耶！');
+  else mood(h>n?'happy':'think',h+' 顆金星、'+n+' 顆銀星。嗯…哪幾個數字是關鍵呢？');
+  render();
+}
+function end(win){
+  S.done=true;clearInterval(S.timer);tick();render();
+  $('oCode').textContent=S.secret.join('');
+  $('chara2').innerHTML=faceSVG(win?'happy':'sad');
+  if(win){
+    const k='hoshimi-best-'+S.len,b=+store.get(k)||Infinity,t=S.hist.length,rec=t<b;
+    if(rec)store.set(k,t);
+    $('oTitle').textContent='封印解除！';
+    $('oText').textContent='露娜：「只用了 '+t+' 次詠唱、'+$('time').textContent+'！'+(rec?'新紀錄！你根本是天才魔導士！':'最佳紀錄是 '+b+' 次，下次再挑戰看看？')+'」';
+    mood('happy','門打開了！你好厲害！');render();
+  }else{
+    $('oTitle').textContent='封印重新關上了…';
+    $('oText').textContent='露娜：「嗚嗚…正確咒文是上面那串。回頭看看紀錄，下次一定能推出來！」';
+    mood('sad','門關上了…再試一次好不好？');
+  }
+  $('over').hidden=false;$('again').focus();
+}
+
+document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>newGame(+b.dataset.len,+b.dataset.max));
+$('del').onclick=()=>{S.input.pop();render()};
+$('clr').onclick=()=>{S.input=[];render()};
+$('go').onclick=submit;
+$('again').onclick=()=>newGame(S.len,S.max);
+$('noteBtn').onclick=e=>{S.note=!S.note;e.currentTarget.setAttribute('aria-pressed',S.note);mood('think',S.note?'筆記模式！點數字可以做記號，不會輸入喔。':'回到詠唱模式～');render()};
+$('candBtn').onclick=e=>{S.showC=!S.showC;e.currentTarget.setAttribute('aria-pressed',S.showC);if(S.showC)mood('happy','讓我用水晶球看看…剩下幾種可能呢？');render()};
+document.addEventListener('keydown',e=>{
+  if(!$('over').hidden){if(e.key==='Enter')newGame(S.len,S.max);return}
+  if(/^[0-9]$/.test(e.key))press(+e.key);
+  else if(e.key==='Backspace'){S.input.pop();render()}
+  else if(e.key==='Enter')submit();
+});
+
+/* ---------- 星空 ---------- */
+(function(){
+  const c=$('stars'),x=c.getContext('2d');let pts=[];
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function size(){c.width=innerWidth*devicePixelRatio;c.height=innerHeight*devicePixelRatio;pts=Array.from({length:70},()=>({x:Math.random()*c.width,y:Math.random()*c.height,r:(Math.random()*1.4+.4)*devicePixelRatio,p:Math.random()*6}))}
+  function draw(t){x.clearRect(0,0,c.width,c.height);for(const s of pts){x.globalAlpha=.35+.35*Math.sin(t/900+s.p);x.fillStyle='#fff6fb';x.beginPath();x.arc(s.x,s.y,s.r,0,7);x.fill()}if(!reduce)requestAnimationFrame(draw)}
+  addEventListener('resize',size);size();requestAnimationFrame(draw);
+})();
+
+const saved=+store.get('hoshimi-mode');
+const btn=document.querySelector('.modes button[data-len="'+(saved||4)+'"]')||document.querySelector('.modes button[data-len="4"]');
+newGame(+btn.dataset.len,+btn.dataset.max);
+</script>
+</body>
+</html>
