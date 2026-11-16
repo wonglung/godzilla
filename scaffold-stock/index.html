@@ -82,6 +82,13 @@ th{font-size:12px;color:var(--muted);font-weight:500}
 td.r,th.r{text-align:right}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:6px;font-weight:500;max-width:calc(100% - 32px);z-index:30}
 .note{font-size:12.5px;color:var(--muted);margin:0;max-width:70ch}
+.meta{font-size:12px;color:var(--muted)}
+.lines{display:flex;flex-direction:column;gap:8px}
+.line{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;gap:8px;align-items:end}
+.line label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:0}
+.aline{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid var(--line);border-left:5px solid var(--ok);border-radius:6px;padding:8px 10px}
+.aline.bydue{border-left-color:var(--warn)}.aline.short{border-left-color:var(--bad)}
+.warnbox{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:8px 10px;font-size:13px}
 .ex{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px}
 @media (max-width:760px){
   .grid2{grid-template-columns:1fr}
@@ -163,6 +170,7 @@ if(!window.claude){(function(){
 
   <nav aria-label="功能">
     <a href="#plan" data-tab="plan">備貨排程</a>
+    <a href="#ask" data-tab="ask">詢問下單</a>
     <a href="#stock" data-tab="stock">庫存與進貨</a>
     <a href="#orders" data-tab="orders">訂單</a>
     <a href="#log" data-tab="log">異動紀錄</a>
@@ -180,6 +188,23 @@ if(!window.claude){(function(){
       </div>
       <p class="note">由上往下依序分配庫存。<span class="chip ok">現在可出</span> 帳上庫存就夠；<span class="chip warn">交期前可出</span> 要等交期前到貨的進貨；<span class="chip bad">趕不上</span> 交期前庫存加進貨仍不足。用 ↑↓ 調整備貨順序。</p>
       <div class="plan" id="plan"></div>
+    </div>
+  </section>
+
+  <!-- 詢問下單 -->
+  <section id="tab-ask" aria-label="詢問下單" hidden>
+    <div class="grid2">
+      <div class="card">
+        <h2>客戶詢問：能不能出貨？</h2>
+        <p class="note">先試算，不會動到庫存或排程。系統會照交期把這張單排進目前的備貨順序，看帳上庫存和在途進貨夠不夠。可以出貨再按「確認下單」。</p>
+        <form class="f" id="fmAsk">
+          <label>客戶／工地<input id="aCust" required placeholder="營造廠或工地名稱"></label>
+          <label>希望交期<input id="aDue" type="date" required></label>
+        </form>
+        <div class="lines" id="aLines"></div>
+        <div class="bar"><button class="btn" id="aAdd" type="button">＋ 加一個品項</button><span class="grow"></span><button class="btn primary" id="aCheck" type="button">查詢能否出貨</button></div>
+      </div>
+      <div class="card" id="aResult" aria-live="polite"></div>
     </div>
   </section>
 
@@ -224,15 +249,7 @@ if(!window.claude){(function(){
   <!-- 訂單 -->
   <section id="tab-orders" aria-label="訂單" hidden>
     <div class="card">
-      <h2>新增訂單</h2>
-      <form class="f" id="fmOrd">
-        <label>客戶／工地<input id="oCust" required placeholder="營造廠或工地名稱"></label>
-        <label>產品<select id="oSku" required></select></label>
-        <label>數量<input id="oQty" type="number" min="1" step="1" required></label>
-        <label>交期<input id="oDue" type="date" required></label>
-        <button class="btn primary">新增訂單</button>
-      </form>
-      <p class="note" id="oHint"></p>
+      <p class="note">新訂單請到「<a href="#ask">詢問下單</a>」先查詢能否出貨，可以再下單。</p>
       <div class="bar"><h2 class="grow">全部訂單</h2>
         <select id="oFilter" aria-label="訂單狀態"><option value="pending">待出貨</option><option value="shipped">已出貨</option><option value="cancelled">已取消</option><option value="">全部</option></select></div>
       <div class="tw"><table><thead><tr><th>交期</th><th>客戶</th><th>產品</th><th class="r">數量</th><th>狀態</th><th>出貨時間</th><th></th></tr></thead><tbody id="tOrd"></tbody></table></div>
@@ -285,8 +302,8 @@ let tt;function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clear
 const logAdd=(sku,delta,after,reason,extra={})=>db.collection('log').add({sku,delta,after,reason,at:nowISO(),...extra});
 
 /* ---------- 排程計算 ---------- */
-function computePlan(){
-  const pend=Object.values(S.orders).filter(o=>o.status==='pending').sort((a,b)=>a.seq-b.seq||(a.due<b.due?-1:1));
+function computePlan(extra=[]){
+  const pend=[...Object.values(S.orders).filter(o=>o.status==='pending'),...extra].sort((a,b)=>a.seq-b.seq||(a.due<b.due?-1:1));
   const cum={},res={};
   for(const o of pend){
     const stock=S.products[o.sku]?.stock??0;
@@ -312,7 +329,11 @@ function render(){
   const {pend,res}=computePlan();
   const anyEx=[...Object.values(S.products),...Object.values(S.orders),...Object.values(S.incoming)].some(x=>x.example);
   $('clearEx').hidden=!anyEx;
-  ['adjSku','iSku','oSku'].forEach(id=>prodOptions($(id)));prodOptions($('fSku'),true);
+  ['adjSku','iSku'].forEach(id=>prodOptions($(id)));prodOptions($('fSku'),true);
+  document.querySelectorAll('.lSku').forEach(s=>prodOptions(s));
+  if(!$('aLines').children.length&&Object.keys(S.products).length)addLine();
+  if(S.ask&&!S.ask.done)S.ask=evaluate(askInput());
+  showAsk();
   const P=S.products,ps=Object.values(P).sort((a,b)=>a.id<b.id?-1:1);
   const demand={},incSum={},worst={};
   for(const o of pend){demand[o.sku]=(demand[o.sku]||0)+o.qty;const k=res[o.id].k;const rank={now:0,bydue:1,short:2};if((rank[k]??0)>(rank[worst[o.sku]]??-1))worst[o.sku]=k}
@@ -412,17 +433,84 @@ $('fmInc').onsubmit=e=>{e.preventDefault();if(!db)return;
   const d={sku:$('iSku').value,qty:parseInt($('iQty').value),eta:$('iEta').value,supplier:$('iSup').value.trim(),received:false,createdAt:nowISO()};
   if(!d.sku)return toast('請先選擇產品。');
   run(()=>db.collection('incoming').add(d),'已登記進貨');e.target.reset()};
-$('fmOrd').onsubmit=e=>{e.preventDefault();if(!db)return;
-  const o={customer:$('oCust').value.trim(),sku:$('oSku').value,qty:parseInt($('oQty').value),due:$('oDue').value,status:'pending',createdAt:nowISO()};
-  if(!o.sku)return toast('請先新增產品。');
-  const {pend}=computePlan();const before=pend.filter(x=>x.due<=o.due);const after=pend.filter(x=>x.due>o.due);
-  const lo=before.length?before[before.length-1].seq:(after.length?after[0].seq-1:0);
-  o.seq=after.length&&before.length?(lo+after[0].seq)/2:lo+1;
-  const p=S.products[o.sku],dem=pend.filter(x=>x.sku===o.sku).reduce((s,x)=>s+x.qty,0);
-  run(()=>db.collection('orders').add(o),`已新增 ${o.customer} 的訂單`);
-  $('oHint').textContent=`${p.name}：帳上 ${p.stock}，含這筆共需 ${dem+o.qty}，${p.stock>=dem+o.qty?'庫存足夠。':'庫存不足 '+(dem+o.qty-p.stock)+' '+p.unit+'，請到排程確認。'}`;
-  e.target.reset();$('oDue').value=TODAY};
-$('oDue').value=TODAY;$('iEta').value=TODAY;
+/* ---------- 詢問下單 ---------- */
+function seqFor(due,pend){
+  const b=pend.filter(x=>x.due<=due),a=pend.filter(x=>x.due>due);
+  if(!b.length)return a.length?a[0].seq-1:1;
+  const lo=b[b.length-1].seq;return a.length?(lo+a[0].seq)/2:lo+1;
+}
+let lineN=0;
+function addLine(){
+  const i=lineN++,d=document.createElement('div');d.className='line';
+  d.innerHTML=`<label>品項<select id="aSku${i}" class="lSku"></select></label><label>數量<input id="aQty${i}" class="lQty" type="number" min="1" step="1"></label><button type="button" class="btn sm" data-rm aria-label="移除這個品項">移除</button>`;
+  $('aLines').append(d);prodOptions(d.querySelector('select'));
+}
+function askInput(){
+  const m={};
+  $('aLines').querySelectorAll('.line').forEach(l=>{const sku=l.querySelector('select').value,q=parseInt(l.querySelector('input').value)||0;if(sku&&q>0)m[sku]=(m[sku]||0)+q});
+  return{cust:$('aCust').value.trim(),due:$('aDue').value,lines:Object.entries(m).map(([sku,qty])=>({sku,qty}))};
+}
+function evaluate(inp){
+  const base=computePlan(),s0=seqFor(inp.due,base.pend);
+  const mk=(d,s)=>inp.lines.map((l,i)=>({id:'ask'+i,customer:inp.cust,sku:l.sku,qty:l.qty,due:d,status:'pending',seq:s+i*1e-6}));
+  const r=computePlan(mk(inp.due,s0));
+  const lines=inp.lines.map((l,i)=>{
+    const res=r.res['ask'+i],p=S.products[l.sku];
+    const used=base.pend.filter(o=>o.sku===l.sku&&o.seq<s0&&(!S.skip||base.res[o.id].k!=='short')).reduce((a,o)=>a+o.qty,0);
+    let earliest=null;
+    if(res.k==='short'){
+      const etas=[...new Set(Object.values(S.incoming).filter(x=>!x.received&&x.sku===l.sku&&x.eta>inp.due).map(x=>x.eta))].sort();
+      for(const d of etas){if(computePlan(mk(d,seqFor(d,base.pend))).res['ask'+i].k!=='short'){earliest=d;break}}
+    }
+    return{...l,p,res,used,earliest};
+  });
+  const hit=base.pend.filter(o=>base.res[o.id].k!=='short'&&r.res[o.id].k==='short');
+  return{...inp,s0,lines,hit,ok:lines.every(x=>x.res.k!=='short')};
+}
+function showAsk(){
+  const el=$('aResult'),R=S.ask;
+  if(!R){el.innerHTML='<h2>查詢結果</h2><p class="note">填好客戶、希望交期和品項數量，按「查詢能否出貨」。這裡會列出每個品項能不能照交期出、缺多少、最快哪天可以出。</p>';return}
+  if(R.done){el.innerHTML=`<h2>已下單 <span class="chip ok">完成</span></h2><p>${esc(R.cust)} 的 ${R.lines.length} 個品項已加入備貨排程，交期 <span class="num">${esc(R.due)}</span>。</p><div class="bar"><a class="btn" href="#plan">查看備貨排程</a></div>`;return}
+  const rows=R.lines.map(l=>{
+    const [cls,txt]=STAT[l.res.k],u=esc(l.p?.unit||''),stock=l.p?.stock??0;
+    let detail=`帳上 ${stock}，排在前面的訂單佔用 ${l.used}，現有可用 ${Math.max(0,stock-l.used)} ${u}`;
+    if(l.res.k==='bydue')detail+='；要等交期前到貨的進貨';
+    if(l.res.k==='short')detail+=`；缺 ${l.res.short} ${u}，`+(l.earliest?`最快 ${l.earliest} 可出`:'在途進貨也不夠，需另外補貨');
+    return `<div class="aline ${l.res.k==='now'?'':l.res.k}"><div style="min-width:0"><b>${esc(l.p?.name||l.sku)}</b> <span class="num">× ${l.qty} ${u}</span><div class="meta">${detail}</div></div><span class="chip ${cls}">${txt}</span></div>`;
+  }).join('');
+  const hit=R.hit.length?`<div class="warnbox">這張單依交期會排在 ${R.hit.length} 筆已接訂單前面，下單後它們會變成趕不上：${R.hit.map(o=>esc(o.customer)+'（'+esc(o.sku)+' × '+o.qty+'）').join('、')}。</div>`:'';
+  const shortL=R.lines.filter(l=>l.res.k==='short');
+  const sugg=!R.ok&&shortL.every(l=>l.earliest)?shortL.map(l=>l.earliest).sort().pop():null;
+  el.innerHTML=`<h2>查詢結果 <span class="chip ${R.ok?'ok':'bad'}">${R.ok?'可以出貨':'無法照交期出貨'}</span></h2>
+    <p class="meta">${esc(R.cust)}，希望交期 <span class="num">${esc(R.due)}</span></p>${rows}${hit}
+    <div class="bar">${R.ok
+      ?`<button class="btn primary" id="aOrder" type="button">${R.hit.length?'仍要下單（會影響 '+R.hit.length+' 筆）':'確認下單'}</button>`
+      :`<span class="meta">先跟客戶確認，調整交期或數量後再查一次。</span>${sugg?`<button class="btn" id="aUse" type="button" data-d="${sugg}">改成 ${sugg} 再查</button>`:''}`}</div>`;
+}
+function staleAsk(){if(S.ask){S.ask=null;showAsk()}}
+$('aAdd').onclick=()=>{addLine();staleAsk()};
+$('aLines').addEventListener('click',e=>{if(e.target.closest('[data-rm]')&&$('aLines').children.length>1){e.target.closest('.line').remove();staleAsk()}});
+['input','change'].forEach(ev=>$('tab-ask').querySelector('.card').addEventListener(ev,staleAsk));
+$('fmAsk').onsubmit=e=>{e.preventDefault();$('aCheck').click()};
+$('aCheck').onclick=()=>{
+  const inp=askInput();
+  if(!inp.cust)return toast('請填客戶或工地名稱。');
+  if(!inp.due)return toast('請選希望交期。');
+  if(!inp.lines.length)return toast('請至少填一個品項和數量。');
+  S.ask=evaluate(inp);showAsk();
+};
+$('aResult').addEventListener('click',e=>{
+  if(e.target.id==='aUse'){$('aDue').value=e.target.dataset.d;$('aCheck').click();return}
+  if(e.target.id!=='aOrder'||!db)return;
+  const R=evaluate(askInput());
+  if(!R.ok){S.ask=R;showAsk();return toast('庫存或排程剛有變動，現在無法照交期出貨，請重新確認。')}
+  run(async()=>{
+    for(let i=0;i<R.lines.length;i++){const l=R.lines[i];
+      await db.collection('orders').add({customer:R.cust,sku:l.sku,qty:l.qty,due:R.due,status:'pending',seq:R.s0+i*1e-6,createdAt:nowISO()})}
+    S.ask={...R,done:true};$('aCust').value='';$('aLines').innerHTML='';
+  },`已幫 ${R.cust} 下單 ${R.lines.length} 個品項`);
+});
+$('iEta').value=TODAY;$('aDue').value=TODAY;
 
 $('clearEx').onclick=e=>{
   if(e.currentTarget.dataset.c!=='1'){e.currentTarget.dataset.c='1';e.currentTarget.textContent='確認刪除全部範例？';e.currentTarget.classList.add('confirm');return}
@@ -434,7 +522,7 @@ $('clearEx').onclick=e=>{
 };
 
 /* ---------- 分頁 ---------- */
-function route(){const t=(location.hash||'#plan').slice(1),ok=['plan','stock','orders','log'].includes(t)?t:'plan';
+function route(){const t=(location.hash||'#plan').slice(1),ok=['plan','ask','stock','orders','log'].includes(t)?t:'plan';
   document.querySelectorAll('nav a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===ok?'page':'false'));
   document.querySelectorAll('section[id^="tab-"]').forEach(s=>s.hidden=s.id!=='tab-'+ok)}
 addEventListener('hashchange',route);route();render();
