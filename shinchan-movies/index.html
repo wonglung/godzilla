@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>小新忍者武士片單</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="hero">
+    <h1>蠟筆小新劇場版片單</h1>
+    <p>忍者系列＋武士系列</p>
+  </header>
+
+  <main>
+    <section class="toolbar" aria-label="篩選">
+      <div class="filters" role="group" aria-label="系列">
+        <button type="button" data-series="全部" aria-pressed="true">全部</button>
+        <button type="button" data-series="忍者" aria-pressed="false">忍者</button>
+        <button type="button" data-series="武士" aria-pressed="false">武士</button>
+      </div>
+      <label class="search">
+        <span>搜尋片名</span>
+        <input type="search" id="search" placeholder="例如：戰國">
+      </label>
+      <label class="check">
+        <input type="checkbox" id="hide-watched"> 隱藏已看過
+      </label>
+    </section>
+
+    <p class="progress" id="progress" aria-live="polite"></p>
+    <ul class="list" id="list"></ul>
+    <p class="empty" id="empty" hidden>沒有符合條件的電影。</p>
+
+    <p class="note">片名與年份為整理資料，請以官方或串流平台資訊為準。「已看過」只存在這台裝置的瀏覽器中。</p>
+  </main>
+
+  <script src="movies.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
