@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>我的原創劇場版</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="poster" aria-label="電影海報">
+    <svg class="poster-art" viewBox="0 0 400 240" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+      <circle cx="300" cy="70" r="46" fill="#fff4c2"/>
+      <path d="M0 200 L70 120 L130 180 L200 100 L270 170 L340 110 L400 160 L400 240 L0 240 Z" fill="rgba(0,0,0,.25)"/>
+      <path d="M0 225 Q100 195 200 220 T400 210 L400 240 L0 240 Z" fill="rgba(0,0,0,.35)"/>
+      <path d="M40 60 Q90 40 140 60 T240 60" stroke="rgba(255,255,255,.55)" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M60 85 Q110 65 160 85 T260 85" stroke="rgba(255,255,255,.35)" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </svg>
+    <div class="poster-text">
+      <p class="eyebrow">原創劇場版</p>
+      <h1 id="title"></h1>
+      <p class="subtitle" id="subtitle"></p>
+      <p class="tagline" id="tagline"></p>
+      <ul class="info" id="info"></ul>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>故事大綱</h2>
+      <p id="synopsis"></p>
+    </section>
+
+    <section>
+      <h2>登場角色</h2>
+      <ul class="characters" id="characters"></ul>
+    </section>
+
+    <section>
+      <h2>三幕劇情</h2>
+      <ol class="acts" id="acts"></ol>
+    </section>
+
+    <section>
+      <h2>名場面預告</h2>
+      <ul class="scenes" id="scenes"></ul>
+    </section>
+
+    <section class="song">
+      <h2 id="song-title"></h2>
+      <p id="song-lyrics"></p>
+    </section>
+
+    <p class="post-credits" id="post-credits"></p>
+
+    <p class="note">本劇場版的角色、地點與劇情皆為原創虛構。想修改內容，請編輯 <code>my-movie/movie.js</code>。<br>
+      <a href="../shinchan-movies/">← 回到蠟筆小新忍者＋武士片單</a></p>
+  </main>
+
+  <script src="movie.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
