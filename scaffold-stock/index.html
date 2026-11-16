@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>鷹架出貨調度台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: warehouse ledger — product stock strip on top, then tabbed work areas (備貨排程 / 庫存 / 訂單 / 異動紀錄). Status uses stripe + chip. */
+:root{
+  --bg:#f3f4f1; --panel:#ffffff; --ink:#1d2320; --muted:#5f6862; --line:#d9ddd6;
+  --accent:#c98a00; --accent-ink:#1d1600; --accent-soft:#fbf1d6;
+  --ok:#1f7a4d; --ok-soft:#e1f2e8; --warn:#9a6400; --warn-soft:#fbefd2; --bad:#b3362c; --bad-soft:#fbe3e0;
+  --f:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141715; --panel:#1c201e; --ink:#e8ebe6; --muted:#9aa49d; --line:#2f3531;
+  --accent:#e8a92a; --accent-ink:#1d1600; --accent-soft:#3a2f14;
+  --ok:#5cc58f; --ok-soft:#173326; --warn:#e8b347; --warn-soft:#3a2f14; --bad:#f07b70; --bad-soft:#3b1d1a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141715; --panel:#1c201e; --ink:#e8ebe6; --muted:#9aa49d; --line:#2f3531;
+  --accent:#e8a92a; --accent-ink:#1d1600; --accent-soft:#3a2f14;
+  --ok:#5cc58f; --ok-soft:#173326; --warn:#e8b347; --warn-soft:#3a2f14; --bad:#f07b70; --bad-soft:#3b1d1a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f);font-size:14.5px;line-height:1.55}
+.wrap{max-width:1080px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:24px;font-weight:900;letter-spacing:.04em;text-wrap:balance}
+h1 span{display:inline-block;background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:700;padding:2px 8px;border-radius:3px;margin-right:8px;vertical-align:4px;letter-spacing:.1em}
+.sub{margin:2px 0 0;color:var(--muted);font-size:13px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.conn{font-size:13px;padding:8px 12px;border-radius:6px;background:var(--warn-soft);color:var(--warn)}
+.strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.prod{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--ok);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.prod.bydue{border-left-color:var(--warn)}.prod.short{border-left-color:var(--bad)}
+.prod .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.prod b{font-size:15px;overflow-wrap:anywhere}
+.prod .sku{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.prod .figs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;font-size:11.5px;color:var(--muted)}
+.prod .figs strong{display:block;font-family:var(--mono);font-size:18px;color:var(--ink);font-weight:600}
+.chip{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}.chip.warn{background:var(--warn-soft);color:var(--warn)}.chip.bad{background:var(--bad-soft);color:var(--bad)}.chip.mute{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+nav{display:flex;gap:4px;border-bottom:2px solid var(--line);overflow-x:auto}
+nav a{padding:8px 14px;color:var(--muted);text-decoration:none;font-weight:700;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+nav a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+section[hidden]{display:none}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.bar .grow{flex:1}
+.counts{display:flex;gap:6px;flex-wrap:wrap}
+button,select,input{font:inherit;color:inherit}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:5px;padding:6px 12px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.ship{background:var(--ok);border-color:var(--ok);color:var(--panel);font-weight:700}
+.btn.confirm{background:var(--bad);border-color:var(--bad);color:var(--panel);font-weight:700}
+.btn.sm{padding:3px 9px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,select:focus-visible,input:focus-visible,nav a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+select,input{border:1px solid var(--line);background:var(--panel);border-radius:5px;padding:6px 8px;min-width:0}
+label.tg{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--muted);cursor:pointer}
+.plan{display:flex;flex-direction:column;gap:6px}
+.row{display:grid;grid-template-columns:44px minmax(0,1.6fr) minmax(0,1.2fr) 90px 110px minmax(0,1.3fr) auto;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--ok);border-radius:6px;padding:8px 10px}
+.row.bydue{border-left-color:var(--warn)}.row.short{border-left-color:var(--bad)}
+.row .seq{font-family:var(--mono);color:var(--muted);font-size:13px;text-align:center}
+.row .cust{font-weight:700;overflow-wrap:anywhere}
+.row .meta{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.row .qty{font-family:var(--mono);font-size:16px;text-align:right}
+.row .acts{display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap}
+.lbl{display:none;font-size:11px;color:var(--muted)}
+.empty{background:var(--panel);border:1px dashed var(--line);border-radius:6px;padding:24px;text-align:center;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card h2{margin:0;font-size:16px}
+form.f{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;align-items:end}
+form.f label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;color:var(--muted);font-weight:500}
+td.r,th.r{text-align:right}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:6px;font-weight:500;max-width:calc(100% - 32px);z-index:30}
+.note{font-size:12.5px;color:var(--muted);margin:0;max-width:70ch}
+.ex{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px}
+@media (max-width:760px){
+  .grid2{grid-template-columns:1fr}
+  .row{grid-template-columns:36px minmax(0,1fr) auto;grid-template-areas:"seq cust qty" "seq prod due" "seq st st" "seq acts acts"}
+  .row .seq{grid-area:seq;align-self:start}.row .c1{grid-area:cust}.row .c2{grid-area:prod}.row .qty{grid-area:qty}.row .c4{grid-area:due;text-align:right}.row .c5{grid-area:st}.row .acts{grid-area:acts;justify-content:flex-start}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<script>
+/* 離開 claude.ai 時的本機資料庫：資料只存在這台電腦的瀏覽器（localStorage）。 */
+if(!window.claude){(function(){
+  const KEY='scaffold-stock-db';let data=null;
+  try{data=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+  if(!data){
+    const ex={example:true,createdAt:'2026-11-16T01:00:00.000Z'};
+    const d=n=>{const t=new Date();t.setDate(t.getDate()+n);return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')};
+    const P=(name,unit,stock)=>({name,unit,stock,...ex});
+    const O=(customer,sku,qty,due,seq)=>({customer,sku,qty,due:d(due),status:'pending',seq,...ex});
+    data={
+      products:{'FS-1219':P('框式鷹架 1219×1700','座',400),'XB-1829':P('交叉拉桿 1829','支',600),'PL-500':P('鋼踏板 500×1829','片',250),'JB-600':P('調整座（螺旋千斤頂）600','個',300),'CW-200':P('鷹架腳輪 200mm','個',80),'GR-1829':P('扶手欄杆 1829','支',150)},
+      orders:{sx1:O('宏建營造（範例）','FS-1219',200,1,1),sx2:O('立興工程（範例）','XB-1829',400,2,2),sx3:O('大川營造（範例）','PL-500',120,3,3),sx4:O('宏建營造（範例）','XB-1829',300,4,4),sx5:O('永泰土木（範例）','JB-600',160,4,5),sx6:O('青山建設（範例）','FS-1219',250,5,6),sx7:O('立興工程（範例）','CW-200',100,6,7),sx8:O('大川營造（範例）','GR-1829',80,8,8)},
+      incoming:{'sx-in1':{sku:'XB-1829',qty:200,eta:d(3),supplier:'南港鋼管（範例）',received:false,...ex}},
+      log:{}
+    };
+  }
+  const subs=new Set();
+  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}subs.forEach(f=>f())};
+  const coll=c=>data[c]||(data[c]={});
+  const clone=v=>JSON.parse(JSON.stringify(v));
+  const snap=(id,v)=>({id,exists:true,data:()=>clone(v),metadata:{fromCache:false,hasPendingWrites:false}});
+  const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  function query(c,ord,lim){
+    const build=()=>{
+      let docs=Object.entries(coll(c)).map(([id,v])=>snap(id,v));
+      if(ord)docs.sort((a,b)=>{const x=a.data()[ord[0]],y=b.data()[ord[0]];return(x<y?-1:x>y?1:0)*(ord[1]==='desc'?-1:1)});
+      if(lim)docs=docs.slice(0,lim);
+      return{docs,size:docs.length,empty:!docs.length,metadata:{fromCache:false,hasPendingWrites:false},docChanges:()=>[]};
+    };
+    return{
+      orderBy:(f,dir)=>query(c,[f,dir||'asc'],lim),
+      limit:n=>query(c,ord,n),
+      get:async()=>build(),
+      onSnapshot(next){const f=()=>next(build());subs.add(f);setTimeout(f);return()=>subs.delete(f)}
+    };
+  }
+  const db={
+    collection:c=>Object.assign(query(c),{
+      doc:id=>db.doc(c+'/'+(id||newId())),
+      add:async v=>{const id=newId();coll(c)[id]=clone(v);save();return db.doc(c+'/'+id)}
+    }),
+    doc:p=>{const[c,id]=p.split('/');return{id,path:p,
+      get:async()=>coll(c)[id]?snap(id,coll(c)[id]):{id,exists:false,data:()=>undefined,metadata:{fromCache:false}},
+      set:async v=>{coll(c)[id]=clone(v);save()},
+      update:async v=>{if(!coll(c)[id])throw{code:'invalid_argument',message:'資料不存在'};Object.assign(coll(c)[id],clone(v));save()},
+      delete:async()=>{delete coll(c)[id];save()}
+    }}
+  };
+  addEventListener('storage',e=>{if(e.key===KEY){try{data=JSON.parse(e.newValue)||{}}catch(_){}subs.forEach(f=>f())}});
+  window.claude={use:async n=>n==='db'?db:null};
+  document.addEventListener('DOMContentLoaded',()=>{
+    const h=document.querySelector('header');
+    if(h)h.insertAdjacentHTML('afterend','<div class="conn">本機版本：資料只存在這台電腦的這個瀏覽器，換電腦或清除瀏覽器資料就會不見。多人共用請用 claude.ai 版本，或改接 Supabase 等資料庫。</div>');
+  });
+})()}
+</script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1><span>鷹架</span>出貨調度台</h1>
+      <p class="sub">框架、拉桿、踏板、調整座等配件：接單看庫存夠不夠、排備貨順序、出貨自動扣帳。今天 <b class="num" id="today"></b></p>
+    </div>
+    <button class="btn" id="clearEx" hidden>清除範例資料</button>
+  </header>
+
+  <div class="conn" id="conn" hidden></div>
+  <div class="strip" id="strip"><div class="empty">正在讀取庫存…</div></div>
+
+  <nav aria-label="功能">
+    <a href="#plan" data-tab="plan">備貨排程</a>
+    <a href="#stock" data-tab="stock">庫存與進貨</a>
+    <a href="#orders" data-tab="orders">訂單</a>
+    <a href="#log" data-tab="log">異動紀錄</a>
+  </nav>
+
+  <!-- 備貨排程 -->
+  <section id="tab-plan" aria-label="備貨排程">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="bar">
+        <div class="counts" id="counts"></div>
+        <span class="grow"></span>
+        <select id="fSku" aria-label="篩選產品"><option value="">全部產品</option></select>
+        <label class="tg"><input type="checkbox" id="skip"> 允許跳單（前面缺貨，後面小單先出）</label>
+        <button class="btn" id="resort">依交期重排</button>
+      </div>
+      <p class="note">由上往下依序分配庫存。<span class="chip ok">現在可出</span> 帳上庫存就夠；<span class="chip warn">交期前可出</span> 要等交期前到貨的進貨；<span class="chip bad">趕不上</span> 交期前庫存加進貨仍不足。用 ↑↓ 調整備貨順序。</p>
+      <div class="plan" id="plan"></div>
+    </div>
+  </section>
+
+  <!-- 庫存 -->
+  <section id="tab-stock" aria-label="庫存與進貨" hidden>
+    <div class="grid2">
+      <div class="card">
+        <h2>產品庫存</h2>
+        <div class="tw"><table><thead><tr><th>料號</th><th>品名</th><th class="r">帳上庫存</th><th class="r">待出貨</th><th class="r">在途進貨</th><th class="r">出完剩餘</th></tr></thead><tbody id="tProd"></tbody></table></div>
+        <h2>庫存調整</h2>
+        <form class="f" id="fmAdj">
+          <label>產品<select id="adjSku" required></select></label>
+          <label>動作<select id="adjMode"><option value="in">入庫（＋）</option><option value="out">報廢／領用（－）</option><option value="set">盤點（設為）</option></select></label>
+          <label>數量<input id="adjQty" type="number" min="0" step="1" required></label>
+          <label>備註<input id="adjNote" placeholder="例：月底盤點"></label>
+          <button class="btn primary">確認調整</button>
+        </form>
+        <h2>新增產品</h2>
+        <form class="f" id="fmProd">
+          <label>料號<input id="pSku" required pattern="[A-Za-z0-9_\-]+" placeholder="FS-1219"></label>
+          <label>品名／規格<input id="pName" required placeholder="框式鷹架 1219×1700"></label>
+          <label>單位<input id="pUnit" value="支" required list="units"><datalist id="units"><option value="支"><option value="座"><option value="片"><option value="個"><option value="組"></datalist></label>
+          <label>期初庫存<input id="pStock" type="number" min="0" step="1" value="0" required></label>
+          <button class="btn primary">新增產品</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>在途進貨</h2>
+        <p class="note">登記預計到貨，排程會算進交期前可用的量。按「到貨入庫」才會加到帳上庫存。</p>
+        <form class="f" id="fmInc">
+          <label>產品<select id="iSku" required></select></label>
+          <label>數量<input id="iQty" type="number" min="1" step="1" required></label>
+          <label>預計到貨<input id="iEta" type="date" required></label>
+          <label>供應商<input id="iSup" placeholder="選填"></label>
+          <button class="btn primary">登記進貨</button>
+        </form>
+        <div class="tw"><table><thead><tr><th>預計到貨</th><th>產品</th><th class="r">數量</th><th>供應商</th><th></th></tr></thead><tbody id="tInc"></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 訂單 -->
+  <section id="tab-orders" aria-label="訂單" hidden>
+    <div class="card">
+      <h2>新增訂單</h2>
+      <form class="f" id="fmOrd">
+        <label>客戶／工地<input id="oCust" required placeholder="營造廠或工地名稱"></label>
+        <label>產品<select id="oSku" required></select></label>
+        <label>數量<input id="oQty" type="number" min="1" step="1" required></label>
+        <label>交期<input id="oDue" type="date" required></label>
+        <button class="btn primary">新增訂單</button>
+      </form>
+      <p class="note" id="oHint"></p>
+      <div class="bar"><h2 class="grow">全部訂單</h2>
+        <select id="oFilter" aria-label="訂單狀態"><option value="pending">待出貨</option><option value="shipped">已出貨</option><option value="cancelled">已取消</option><option value="">全部</option></select></div>
+      <div class="tw"><table><thead><tr><th>交期</th><th>客戶</th><th>產品</th><th class="r">數量</th><th>狀態</th><th>出貨時間</th><th></th></tr></thead><tbody id="tOrd"></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- 紀錄 -->
+  <section id="tab-log" aria-label="異動紀錄" hidden>
+    <div class="card">
+      <h2>最近 100 筆庫存異動</h2>
+      <div class="tw"><table><thead><tr><th>時間</th><th>產品</th><th class="r">變動</th><th class="r">異動後</th><th>原因</th></tr></thead><tbody id="tLog"></tbody></table></div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const dstr=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const TODAY=dstr(new Date());
+const nowISO=()=>new Date().toISOString();
+const fmtTime=iso=>{if(!iso)return'';const d=new Date(iso);return dstr(d)+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
+const S={products:{},orders:{},incoming:{},log:[],loaded:0,confirm:null,busy:false};
+let db=null;
+try{S.skip=localStorage.getItem('wms-skip')==='1'}catch(e){}
+$('skip').checked=!!S.skip;$('today').textContent=TODAY;
+
+/* ---------- 資料連線 ---------- */
+function conn(msg){const el=$('conn');el.hidden=!msg;el.textContent=msg||''}
+(async()=>{
+  db=window.claude?.use?await window.claude.use('db'):null;
+  if(!db){conn('目前無法連線資料庫，資料不會儲存。請登入 claude.ai 後重新開啟此頁。');$('strip').innerHTML='<div class="empty">沒有資料庫連線</div>';return}
+  const timer=setTimeout(()=>conn('資料尚未載入完成，網路可能不穩，畫面可能不是最新。'),10000);
+  const done=snap=>{if(!snap.metadata.fromCache){clearTimeout(timer);conn('')}};
+  const fail=e=>{clearTimeout(timer);conn('資料連線中斷（'+e.code+'），請重新整理頁面。')};
+  for(const k of['products','orders','incoming'])
+    db.collection(k).onSnapshot(snap=>{S[k]=Object.fromEntries(snap.docs.map(d=>[d.id,{id:d.id,...d.data()}]));S.loaded|=1<<['products','orders','incoming'].indexOf(k);done(snap);render()},fail);
+  db.collection('log').orderBy('at','desc').limit(100).onSnapshot(snap=>{S.log=snap.docs.map(d=>({id:d.id,...d.data()}));render()},fail);
+})();
+
+async function run(fn,okMsg){
+  if(S.busy)return;S.busy=true;
+  try{await fn();if(okMsg)toast(okMsg)}
+  catch(e){toast(e&&e.code==='invalid_argument'?'你沒有修改權限，或資料格式不正確。':e&&e.code==='quota_exceeded'?'資料庫已滿，請先刪除舊資料。':'儲存失敗：'+(e&&e.message||e))}
+  finally{S.busy=false;render()}
+}
+let tt;function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,3200)}
+const logAdd=(sku,delta,after,reason,extra={})=>db.collection('log').add({sku,delta,after,reason,at:nowISO(),...extra});
+
+/* ---------- 排程計算 ---------- */
+function computePlan(){
+  const pend=Object.values(S.orders).filter(o=>o.status==='pending').sort((a,b)=>a.seq-b.seq||(a.due<b.due?-1:1));
+  const cum={},res={};
+  for(const o of pend){
+    const stock=S.products[o.sku]?.stock??0;
+    const inc=Object.values(S.incoming).filter(i=>!i.received&&i.sku===o.sku&&i.eta<=o.due).reduce((s,i)=>s+i.qty,0);
+    const c=cum[o.sku]||0;let r;
+    if(c+o.qty<=stock)r={k:'now'};
+    else if(c+o.qty<=stock+inc)r={k:'bydue'};
+    else r={k:'short',short:Math.min(o.qty,c+o.qty-stock-inc)};
+    if(!S.skip||r.k!=='short')cum[o.sku]=c+o.qty;
+    res[o.id]=r;
+  }
+  return{pend,res};
+}
+const STAT={now:['ok','現在可出'],bydue:['warn','交期前可出'],short:['bad','趕不上']};
+
+/* ---------- 畫面 ---------- */
+function prodOptions(sel,withAll){
+  const v=sel.value,ps=Object.values(S.products).sort((a,b)=>a.id<b.id?-1:1);
+  sel.innerHTML=(withAll?'<option value="">全部產品</option>':'')+ps.map(p=>`<option value="${esc(p.id)}">${esc(p.id)}　${esc(p.name)}</option>`).join('');
+  if([...sel.options].some(o=>o.value===v))sel.value=v;
+}
+function render(){
+  const {pend,res}=computePlan();
+  const anyEx=[...Object.values(S.products),...Object.values(S.orders),...Object.values(S.incoming)].some(x=>x.example);
+  $('clearEx').hidden=!anyEx;
+  ['adjSku','iSku','oSku'].forEach(id=>prodOptions($(id)));prodOptions($('fSku'),true);
+  const P=S.products,ps=Object.values(P).sort((a,b)=>a.id<b.id?-1:1);
+  const demand={},incSum={},worst={};
+  for(const o of pend){demand[o.sku]=(demand[o.sku]||0)+o.qty;const k=res[o.id].k;const rank={now:0,bydue:1,short:2};if((rank[k]??0)>(rank[worst[o.sku]]??-1))worst[o.sku]=k}
+  for(const i of Object.values(S.incoming))if(!i.received)incSum[i.sku]=(incSum[i.sku]||0)+i.qty;
+
+  // 產品狀態列
+  $('strip').innerHTML=(S.loaded&1)===0?'<div class="empty">正在讀取庫存…</div>':ps.length?ps.map(p=>{
+    const d=demand[p.id]||0,left=p.stock-d,w=worst[p.id]||'now',[cls,txt]=STAT[w];
+    const chip=d===0?'<span class="chip mute">無待出貨</span>':w==='now'?'<span class="chip ok">庫存足夠</span>':w==='bydue'?'<span class="chip warn">需等進貨</span>':'<span class="chip bad">缺 '+(-(left+(incSum[p.id]||0)))+' '+esc(p.unit)+'</span>';
+    return `<div class="prod ${w==='now'?'':w}"><div class="top"><b>${esc(p.name)}${p.example?'<span class="ex">範例</span>':''}</b>${chip}</div><span class="sku">${esc(p.id)}</span>
+      <div class="figs"><div>帳上庫存<strong>${p.stock}</strong></div><div>待出貨<strong>${d}</strong></div><div>出完剩餘<strong style="color:${left<0?'var(--bad)':'inherit'}">${left}</strong></div></div></div>`}).join(''):'<div class="empty">還沒有產品。到「庫存與進貨」新增第一個產品。</div>';
+
+  // 排程
+  const f=$('fSku').value,list=pend.filter(o=>!f||o.sku===f);
+  const cnt={now:0,bydue:0,short:0};list.forEach(o=>cnt[res[o.id].k]++);
+  $('counts').innerHTML=`<span class="chip ok">現在可出 ${cnt.now}</span><span class="chip warn">交期前可出 ${cnt.bydue}</span><span class="chip bad">趕不上 ${cnt.short}</span>`;
+  $('plan').innerHTML=list.length?list.map((o,idx)=>{
+    const r=res[o.id],[cls,txt]=STAT[r.k],p=P[o.sku],unit=p?.unit||'',gi=pend.indexOf(o);
+    const late=o.due<TODAY?'<span class="chip bad">已逾期</span> ':o.due===TODAY?'<span class="chip warn">今天到期</span> ':'';
+    const conf=S.confirm===o.id;
+    return `<div class="row ${r.k==='now'?'':r.k}">
+      <span class="seq">#${gi+1}</span>
+      <div class="c1"><div class="cust">${esc(o.customer)}${o.example?'<span class="ex">範例</span>':''}</div></div>
+      <div class="c2 meta">${esc(o.sku)}　${esc(p?.name||'（產品已刪除）')}</div>
+      <div class="qty">${o.qty} <small class="meta">${esc(unit)}</small></div>
+      <div class="c4 meta">交期 <span class="num">${esc(o.due)}</span></div>
+      <div class="c5">${late}<span class="chip ${cls}">${txt}${r.k==='short'?'，缺 '+r.short:''}</span></div>
+      <div class="acts">
+        <button class="btn sm" data-act="up" data-id="${o.id}" ${gi===0?'disabled':''} aria-label="往前">↑</button>
+        <button class="btn sm" data-act="down" data-id="${o.id}" ${gi===pend.length-1?'disabled':''} aria-label="往後">↓</button>
+        <button class="btn sm ${conf?'confirm':'ship'}" data-act="ship" data-id="${o.id}" ${r.k==='now'&&p&&p.stock>=o.qty?'':'disabled'}>${conf?'確認扣 '+o.qty+' '+esc(unit)+'？':'出貨'}</button>
+      </div></div>`}).join(''):`<div class="empty">${(S.loaded&2)===0?'正在讀取訂單…':'沒有待出貨訂單。到「訂單」新增一筆。'}</div>`;
+
+  // 庫存表
+  $('tProd').innerHTML=ps.map(p=>{const d=demand[p.id]||0,left=p.stock-d;return `<tr><td class="num">${esc(p.id)}</td><td>${esc(p.name)}</td><td class="r num">${p.stock} ${esc(p.unit)}</td><td class="r num">${d}</td><td class="r num">${incSum[p.id]||0}</td><td class="r num" style="color:${left<0?'var(--bad)':'inherit'}">${left}</td></tr>`}).join('')||'<tr><td colspan="6" class="meta">尚無產品</td></tr>';
+  const incs=Object.values(S.incoming).filter(i=>!i.received).sort((a,b)=>a.eta<b.eta?-1:1);
+  $('tInc').innerHTML=incs.map(i=>`<tr><td class="num">${esc(i.eta)}${i.eta<TODAY?' <span class="chip bad">延遲</span>':''}</td><td>${esc(P[i.sku]?.name||i.sku)}</td><td class="r num">${i.qty}</td><td>${esc(i.supplier||'')}</td><td><button class="btn sm ${S.confirm===i.id?'confirm':''}" data-act="recv" data-id="${i.id}">${S.confirm===i.id?'確認入庫？':'到貨入庫'}</button> <button class="btn sm" data-act="delinc" data-id="${i.id}">刪除</button></td></tr>`).join('')||'<tr><td colspan="5" class="meta">沒有在途進貨</td></tr>';
+
+  // 訂單表
+  const of=$('oFilter').value,SN={pending:'待出貨',shipped:'已出貨',cancelled:'已取消'};
+  const ords=Object.values(S.orders).filter(o=>!of||o.status===of).sort((a,b)=>of==='shipped'?(a.shippedAt<b.shippedAt?1:-1):(a.due<b.due?-1:1));
+  $('tOrd').innerHTML=ords.map(o=>`<tr><td class="num">${esc(o.due)}</td><td>${esc(o.customer)}</td><td>${esc(P[o.sku]?.name||o.sku)}</td><td class="r num">${o.qty}</td><td><span class="chip ${o.status==='shipped'?'ok':o.status==='cancelled'?'mute':'warn'}">${SN[o.status]}</span></td><td class="num">${fmtTime(o.shippedAt)}</td><td>${o.status==='pending'?`<button class="btn sm ${S.confirm==='c'+o.id?'confirm':''}" data-act="cancel" data-id="${o.id}">${S.confirm==='c'+o.id?'確認取消？':'取消訂單'}</button>`:''}</td></tr>`).join('')||'<tr><td colspan="7" class="meta">沒有符合的訂單</td></tr>';
+
+  // 紀錄
+  $('tLog').innerHTML=S.log.map(l=>`<tr><td class="num">${fmtTime(l.at)}</td><td>${esc(P[l.sku]?.name||l.sku)}</td><td class="r num" style="color:${l.delta<0?'var(--bad)':'var(--ok)'}">${l.delta>0?'+':''}${l.delta}</td><td class="r num">${l.after??''}</td><td>${esc(l.reason)}</td></tr>`).join('')||'<tr><td colspan="5" class="meta">還沒有庫存異動。出貨、入庫、盤點都會記在這裡。</td></tr>';
+}
+
+/* ---------- 動作 ---------- */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');
+  if(!b){if(S.confirm&&!e.target.closest('button')){S.confirm=null;render()}return}
+  const id=b.dataset.id,act=b.dataset.act;
+  if(!db)return toast('沒有資料庫連線，無法儲存。');
+  if(act==='ship'){
+    if(S.confirm!==id){S.confirm=id;return render()}
+    S.confirm=null;const o=S.orders[id],p=S.products[o.sku];
+    if(!p||p.stock<o.qty)return toast('帳上庫存不足，無法出貨。');
+    const after=p.stock-o.qty;
+    run(async()=>{await db.doc('products/'+o.sku).update({stock:after});await db.doc('orders/'+id).update({status:'shipped',shippedAt:nowISO()});await logAdd(o.sku,-o.qty,after,'出貨給 '+o.customer,{orderId:id})},`已出貨給 ${o.customer}，${p.name} 帳上剩 ${after} ${p.unit}`);
+  }
+  if(act==='up'||act==='down'){
+    const {pend}=computePlan(),i=pend.findIndex(o=>o.id===id),j=act==='up'?i-1:i+1;if(j<0||j>=pend.length)return;
+    const a=pend[i],c=pend[j];let sa=c.seq,sc=a.seq;if(sa===sc){sa=c.seq;sc=c.seq+(act==='up'?1:-1)*0.5}
+    run(async()=>{await db.doc('orders/'+a.id).update({seq:sa});await db.doc('orders/'+c.id).update({seq:sc})});
+  }
+  if(act==='recv'){
+    if(S.confirm!==id){S.confirm=id;return render()}
+    S.confirm=null;const i=S.incoming[id],p=S.products[i.sku];if(!p)return toast('找不到這個產品。');
+    const after=p.stock+i.qty;
+    run(async()=>{await db.doc('products/'+i.sku).update({stock:after});await db.doc('incoming/'+id).update({received:true,receivedAt:nowISO()});await logAdd(i.sku,i.qty,after,'進貨入庫'+(i.supplier?'（'+i.supplier+'）':''))},`${p.name} 入庫 ${i.qty}，帳上 ${after} ${p.unit}`);
+  }
+  if(act==='delinc')run(()=>db.doc('incoming/'+id).delete(),'已刪除進貨登記');
+  if(act==='cancel'){
+    if(S.confirm!=='c'+id){S.confirm='c'+id;return render()}
+    S.confirm=null;run(()=>db.doc('orders/'+id).update({status:'cancelled'}),'訂單已取消，不影響庫存');
+  }
+});
+$('fSku').onchange=render;$('oFilter').onchange=render;
+$('skip').onchange=e=>{S.skip=e.target.checked;try{localStorage.setItem('wms-skip',S.skip?'1':'0')}catch(_){}render()};
+$('resort').onclick=()=>{if(!db)return;const {pend}=computePlan();const sorted=[...pend].sort((a,b)=>a.due<b.due?-1:a.due>b.due?1:a.seq-b.seq);
+  run(async()=>{for(let i=0;i<sorted.length;i++)if(sorted[i].seq!==i+1)await db.doc('orders/'+sorted[i].id).update({seq:i+1})},'已依交期重新排序')};
+
+$('fmProd').onsubmit=e=>{e.preventDefault();if(!db)return toast('沒有資料庫連線，無法儲存。');
+  const sku=$('pSku').value.trim();if(S.products[sku])return toast('料號 '+sku+' 已存在。');
+  const stock=Math.max(0,parseInt($('pStock').value)||0),name=$('pName').value.trim(),unit=$('pUnit').value.trim()||'支';
+  run(async()=>{await db.doc('products/'+sku).set({name,unit,stock,createdAt:nowISO()});if(stock)await logAdd(sku,stock,stock,'期初庫存')},'已新增 '+name);
+  e.target.reset();$('pUnit').value='支';$('pStock').value=0};
+$('fmAdj').onsubmit=e=>{e.preventDefault();if(!db)return;
+  const sku=$('adjSku').value,p=S.products[sku];if(!p)return toast('請先選擇產品。');
+  const q=Math.max(0,parseInt($('adjQty').value)||0),mode=$('adjMode').value,note=$('adjNote').value.trim();
+  const after=mode==='in'?p.stock+q:mode==='out'?p.stock-q:q;
+  if(after<0)return toast('扣除後會變負數，帳上只有 '+p.stock+'。');
+  const label={in:'入庫',out:'報廢／領用',set:'盤點'}[mode];
+  run(async()=>{await db.doc('products/'+sku).update({stock:after});await logAdd(sku,after-p.stock,after,label+(note?'：'+note:''))},`${p.name} ${label}完成，帳上 ${after} ${p.unit}`);
+  e.target.reset()};
+$('fmInc').onsubmit=e=>{e.preventDefault();if(!db)return;
+  const d={sku:$('iSku').value,qty:parseInt($('iQty').value),eta:$('iEta').value,supplier:$('iSup').value.trim(),received:false,createdAt:nowISO()};
+  if(!d.sku)return toast('請先選擇產品。');
+  run(()=>db.collection('incoming').add(d),'已登記進貨');e.target.reset()};
+$('fmOrd').onsubmit=e=>{e.preventDefault();if(!db)return;
+  const o={customer:$('oCust').value.trim(),sku:$('oSku').value,qty:parseInt($('oQty').value),due:$('oDue').value,status:'pending',createdAt:nowISO()};
+  if(!o.sku)return toast('請先新增產品。');
+  const {pend}=computePlan();const before=pend.filter(x=>x.due<=o.due);const after=pend.filter(x=>x.due>o.due);
+  const lo=before.length?before[before.length-1].seq:(after.length?after[0].seq-1:0);
+  o.seq=after.length&&before.length?(lo+after[0].seq)/2:lo+1;
+  const p=S.products[o.sku],dem=pend.filter(x=>x.sku===o.sku).reduce((s,x)=>s+x.qty,0);
+  run(()=>db.collection('orders').add(o),`已新增 ${o.customer} 的訂單`);
+  $('oHint').textContent=`${p.name}：帳上 ${p.stock}，含這筆共需 ${dem+o.qty}，${p.stock>=dem+o.qty?'庫存足夠。':'庫存不足 '+(dem+o.qty-p.stock)+' '+p.unit+'，請到排程確認。'}`;
+  e.target.reset();$('oDue').value=TODAY};
+$('oDue').value=TODAY;$('iEta').value=TODAY;
+
+$('clearEx').onclick=e=>{
+  if(e.currentTarget.dataset.c!=='1'){e.currentTarget.dataset.c='1';e.currentTarget.textContent='確認刪除全部範例？';e.currentTarget.classList.add('confirm');return}
+  const btn=e.currentTarget;btn.dataset.c='';btn.textContent='清除範例資料';btn.classList.remove('confirm');
+  run(async()=>{
+    for(const k of['orders','incoming','products'])for(const x of Object.values(S[k]))if(x.example)await db.doc(k+'/'+x.id).delete();
+    for(const l of S.log)if(l.example)await db.doc('log/'+l.id).delete();
+  },'範例資料已清除');
+};
+
+/* ---------- 分頁 ---------- */
+function route(){const t=(location.hash||'#plan').slice(1),ok=['plan','stock','orders','log'].includes(t)?t:'plan';
+  document.querySelectorAll('nav a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===ok?'page':'false'));
+  document.querySelectorAll('section[id^="tab-"]').forEach(s=>s.hidden=s.id!=='tab-'+ok)}
+addEventListener('hashchange',route);route();render();
+</script>
+</body>
+</html>
