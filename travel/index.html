@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>出國行程試算</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">從台灣出發</p>
+    <h1>出國行程與費用試算</h1>
+    <p class="lead">選目的地、天數與預算等級，馬上看到每日行程與大約要花多少錢。可以一次選多個地方比較。</p>
+  </header>
+
+  <main>
+    <form class="panel" id="planner" aria-label="旅遊條件">
+      <fieldset>
+        <legend>目的地 <span class="hint">可複選</span></legend>
+        <div class="quick">
+          <button type="button" data-pick="all">全選</button>
+          <button type="button" data-pick="東亞">東亞</button>
+          <button type="button" data-pick="東南亞">東南亞</button>
+          <button type="button" data-pick="歐洲">歐洲</button>
+          <button type="button" data-pick="none">清除</button>
+        </div>
+        <div class="chips" id="destinations"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>出國天數</legend>
+        <div class="chips" id="days"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>預算等級</legend>
+        <div class="options" id="tiers"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>出發季節</legend>
+        <div class="options" id="seasons"></div>
+      </fieldset>
+
+      <div class="row">
+        <label class="field">
+          <span>人數</span>
+          <input type="number" id="people" min="1" max="20" value="2" inputmode="numeric">
+        </label>
+        <label class="field">
+          <span>每人預算上限（選填，NT$）</span>
+          <input type="number" id="budget" min="0" step="1000" placeholder="例如 40000" inputmode="numeric">
+        </label>
+      </div>
+    </form>
+
+    <section aria-labelledby="compare-title">
+      <h2 id="compare-title">費用比較</h2>
+      <p class="sub" id="summary"></p>
+      <div id="compare"></div>
+    </section>
+
+    <section aria-labelledby="detail-title">
+      <h2 id="detail-title">行程與費用明細</h2>
+      <div class="cards" id="cards"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>金額為新台幣估算值，依 2026 年一般市場行情整理，實際價格會隨匯率、航空公司與訂房時間變動。簽證與入境規定請於出發前向外交部領事事務局及當地官方確認。</p>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
